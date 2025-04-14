@@ -10,9 +10,6 @@
 #include "ieskf_slam/math/mean_cov_filter.h"
 
 namespace IESKFSlam {
-    
-    static Eigen::Matrix<double, 18, 18> I18{ Eigen::Matrix<double, 18, 18>::Identity()};
-    static Eigen::Matrix3d I3{ Eigen::Matrix3d::Identity()};
 
     IESKF::IESKF(const std::string &config_path, const std::string &prefix)
         : ModuleBase(config_path, prefix, "IESKF") {
@@ -135,7 +132,7 @@ namespace IESKFSlam {
         }
         cnt_++;
         X = x_k_k;
-        P = (Eigen::Matrix<double, 18, 18>::Identity() - K * H_k) * P_in_update;
+        P = (I18 - K * H_k) * P_in_update;
         
         if(converge)
             return true;
