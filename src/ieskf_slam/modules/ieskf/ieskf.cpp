@@ -45,30 +45,36 @@ namespace IESKFSlam {
 
         static Eigen::Matrix<double, 18, 18> Fx;
         static Eigen::Matrix<double, 18, 12> Fw;
-        static Eigen::Matrix3d rotation, Idt;
+        static Eigen::Matrix3d rotation, Idt,  A_mat, Rdt;
+        static Eigen::Vector3d gyr_dt;
 
         Idt = I3 * dt;
 
         imu.acceleration -= X.ba;
         imu.gyroscope -= X.bg;
         rotation = X.rotation.toRotationMatrix();
+        
+        gyr_dt = imu.gyroscope * dt;
+        A_mat = A_T(-gyr_dt);
+        Rdt = rotation * dt;
+
         X.rotation =
-            Eigen::Quaterniond(X.rotation.toRotationMatrix() * so3Exp((imu.gyroscope) * dt));
+            Eigen::Quaterniond(X.rotation.toRotationMatrix() * so3Exp(gyr_dt));
         X.rotation.normalize();
         X.position += X.velocity * dt;
-        X.velocity += (rotation * (imu.acceleration) + X.gravity) * dt;
+        X.velocity += (rotation * imu.acceleration + X.gravity) * dt;
         Fw.setZero();
         Fx.setIdentity();
-        Fx.block<3, 3>(0, 0) = so3Exp(-1 * imu.gyroscope * dt);
+        Fx.block<3, 3>(0, 0) = so3Exp(-1 * gyr_dt);
 
-        Fx.block<3, 3>(0, 9) = -1 * A_T(-imu.gyroscope * dt) * dt;
+        Fx.block<3, 3>(0, 9) = -1 * A_mat * dt;
 
         Fx.block<3, 3>(3, 6) = Idt;
-        Fx.block<3, 3>(6, 0) = rotation * skewSymmetric(imu.acceleration) * dt * (-1);
-        Fx.block<3, 3>(6, 12) = rotation * dt * (-1);
+        Fx.block<3, 3>(6, 0) = -Rdt * skewSymmetric(imu.acceleration) ;
+        Fx.block<3, 3>(6, 12) = -Rdt;
         Fx.block<3, 3>(6, 15) = Idt;
-        Fw.block<3, 3>(0, 0) = -1 * A_T(-imu.gyroscope * dt) * dt;
-        Fw.block<3, 3>(6, 3) = -1 * rotation * dt;
+        Fw.block<3, 3>(0, 0) = -1 * A_mat * dt;
+        Fw.block<3, 3>(6, 3) = -Rdt;
         Fw.block<3, 3>(9, 6) = Fw.block<3, 3>(12, 9) = Idt;
         P = Fx * P * Fx.transpose() + Fw * Q * Fw.transpose();
     }
@@ -76,8 +82,7 @@ namespace IESKFSlam {
     bool IESKF::update() {
 
         static int cnt_ = 0;
-        auto x_k_k = X;
-        auto x_k_last = X;
+        
         ///. 开迭
         static Eigen::MatrixXd K;
         static Eigen::MatrixXd H_k;
@@ -89,6 +94,9 @@ namespace IESKFSlam {
         static Eigen::MatrixXd R_inv;
         static Eigen::MatrixXd H_kt;
         static Eigen::MatrixXd update_x;
+        static State18 x_k_k;
+
+        x_k_k =  X;
 
         bool converge = true;
         for (int i = 0; i < iter_times; i++) {
@@ -99,7 +107,6 @@ namespace IESKFSlam {
             J_inv.block<3, 3>(0, 0) = A_T(error_state.block<3, 1>(0, 0));
             // 更新 P
             P_in_update = J_inv * P * J_inv.transpose();
-
             
             // 调用接口计算 Z H
             calc_zh_ptr->calculate(x_k_k, z_k, H_k);
@@ -145,6 +152,7 @@ namespace IESKFSlam {
 
         return true;
     }
+    
     Eigen::Matrix<double, 18, 1> IESKF::getErrorState18(const State18 &s1, const State18 &s2) {
         Eigen::Matrix<double, 18, 1> es;
         es.setZero();

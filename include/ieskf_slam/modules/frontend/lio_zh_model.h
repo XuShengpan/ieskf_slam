@@ -32,10 +32,16 @@ namespace IESKFSlam
             loss_v.resize(current_cloud_ptr->size());
             std::vector<bool> is_effect_point(current_cloud_ptr->size(),false);
             std::vector<loss_type> loss_real;
+
+            Point point_world;
             int  vaild_points_num = 0;
+            loss_type loss;
+            Eigen::Vector4d pabcd;
+            Eigen::Vector3d dr;
+
             #ifdef MP_EN
                 omp_set_num_threads(MP_PROC_NUM);
-                #pragma omp parallel for
+                #pragma omp parallel for reduction(+: vaild_points_num) private(point_world, loss, pabcd)
             #endif
             /**
              * 有效点的判断
@@ -48,8 +54,8 @@ namespace IESKFSlam
             for (size_t  i = 0; i < current_cloud_ptr->size(); i++)
             {
                 // . 变换到世界系
-                Point point_imu = current_cloud_ptr->points[i];
-                Point point_world;
+                const Point& point_imu = current_cloud_ptr->points[i];
+                
                 point_world = transformPoint(point_imu,state.rotation,state.position);
                 // . 临近搜索
                 std::vector<int> point_ind;
@@ -61,19 +67,18 @@ namespace IESKFSlam
                     continue;
                 }
                 // . 判断这些点够不够成平面
-                std::vector<Point> planar_points;
-                for (int ni = 0; ni < NEAR_POINTS_NUM; ni++)
-                {
-                    planar_points.push_back(local_map_ptr->at(point_ind[ni]));
+                std::vector<Point> planar_points(NEAR_POINTS_NUM);
+                for (int ni = 0; ni < NEAR_POINTS_NUM; ni++) {
+                    planar_points[ni] = local_map_ptr->points[point_ind[ni]];
                 }
-                Eigen::Vector4d pabcd;
+                
                 // . 如果构成平面
                 if (planarCheck(planar_points,pabcd,0.1))    
                 {
                     // . 计算点到平面距离
                     double pd = point_world.x*pabcd(0)+point_world.y*pabcd(1)+point_world.z*pabcd(2)+pabcd(3);
                     // . 记录残差
-                    loss_type loss;
+                    
                     loss.thrid = pd; // 残差
                     loss.first = {point_imu.x,point_imu.y,point_imu.z}; // imu系下点的坐标，用于求H
                     loss.second = pabcd.block<3,1>(0,0);// 平面法向量 用于求H
@@ -87,20 +92,22 @@ namespace IESKFSlam
                         is_effect_point[i] = true;
                     }
                 }
-
             }
-            for (size_t i = 0; i <current_cloud_ptr->size() ; i++)
-            {
-                if(is_effect_point[i])loss_real.push_back(loss_v[i]);
+
+            loss_real.resize(vaild_points_num);
+            int ii = 0;
+            for (size_t i = 0; i <current_cloud_ptr->size() ; i++) {
+                if(is_effect_point[i])
+                    loss_real[ii++] = loss_v[i];
             }
             // 根据有效点的数量分配H Z的大小
-            vaild_points_num = loss_real.size();
+            //vaild_points_num = loss_real.size();
             H = Eigen::MatrixXd::Zero(vaild_points_num, 18); 
             Z.resize(vaild_points_num,1);
             for (int vi = 0; vi < vaild_points_num; vi++)
             {
                 // H 记录导数
-                Eigen::Vector3d dr = -1*loss_real[vi].second.transpose()*state.rotation.toRotationMatrix()*skewSymmetric(loss_real[vi].first);
+                dr = -1*loss_real[vi].second.transpose()*state.rotation.toRotationMatrix()*skewSymmetric(loss_real[vi].first);
                 H.block<1,3>(vi,0) = dr.transpose();
                 H.block<1,3>(vi,3) = loss_real[vi].second.transpose();
                 // Z记录距离
