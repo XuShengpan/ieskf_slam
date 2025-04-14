@@ -9,8 +9,10 @@
 #include "wrapper/ros_noetic/ieskf_frontend_noetic_wrapper.h"
 #include "wrapper/ros_noetic/lidar_process/avia_process.h"
 #include "wrapper/ros_noetic/lidar_process/velodyne_process.h"
+#include "wrapper/ros_noetic/lidar_process/hesai_xt16_process.h"
+
 namespace ROSNoetic {
-    enum LIDAR_TYPE { AVIA = 0, VELO = 1 };
+    enum LIDAR_TYPE { AVIA = 0, VELO = 1 , HESAI_XT16=10};
     class IESKFFrontEndWrapper {
        private:
         IESKFSlam::FrontEnd::Ptr front_end_ptr;

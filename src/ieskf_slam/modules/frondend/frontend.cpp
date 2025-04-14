@@ -7,6 +7,8 @@
  * @LastEditTime: 2023-07-02 15:27:35
  */
 #include "ieskf_slam/modules/frontend/frontend.h"
+#include "ieskf_slam/math/mean_cov_filter.h"
+
 namespace IESKFSlam {
     FrontEnd::FrontEnd(const std::string &config_file_path, const std::string &prefix)
         : ModuleBase(config_file_path, prefix, "Front End Module") {
@@ -71,7 +73,8 @@ namespace IESKFSlam {
             fbpropagate_ptr->propagate(mg, ieskf_ptr);
             voxel_filter.setInputCloud(mg.cloud.cloud_ptr);
             voxel_filter.filter(*filter_point_cloud_ptr);
-            ieskf_ptr->update();
+            if(!ieskf_ptr->update())
+                return false;
             auto state = ieskf_ptr->getX();
             if (enable_record) {
                 record_file << std::setprecision(15) << mg.lidar_end_time << " "
@@ -126,37 +129,58 @@ namespace IESKFSlam {
         }
         return true;
     }
+
     void FrontEnd::initState(MeasureGroup &mg) {
-        static int imu_count = 0;
-        static Eigen::Vector3d mean_acc{0, 0, 0};
-        auto &ieskf = *ieskf_ptr;
-        if (imu_inited) {
-            return;
-        }
 
+        mpcdps::MeanCovFilter<3> mcf_acc, mcf_gyr;
         for (size_t i = 0; i < mg.imus.size(); i++) {
-            imu_count++;
-            auto x = ieskf.getX();
-            mean_acc += mg.imus[i].acceleration;
-            x.bg += mg.imus[i].gyroscope;
-            ieskf.setX(x);
+            mcf_acc.push(mg.imus[i].acceleration);
+            mcf_gyr.push(mg.imus[i].gyroscope);
         }
-        if (imu_count >= 5) {
-            auto x = ieskf.getX();
-            mean_acc /= double(imu_count);
 
-            x.bg /= double(imu_count);
-            imu_scale = GRAVITY / mean_acc.norm();
+        const Eigen::Vector3d acc_mean = mcf_acc.get_mean();
+        const Eigen::Matrix3d acc_cov = mcf_acc.get_covariance();
+        const Eigen::Vector3d gyr_mean = mcf_gyr.get_mean();
+        const Eigen::Matrix3d gyr_cov = mcf_gyr.get_covariance();
 
-            // 重力的符号为负 就和fastlio公式一致
-            x.gravity = -mean_acc / mean_acc.norm() * GRAVITY;
-            ieskf.setX(x);
-            imu_inited = true;
-            fbpropagate_ptr->imu_scale = imu_scale;
-            fbpropagate_ptr->last_imu = mg.imus.back();
-            fbpropagate_ptr->last_lidar_end_time_ = mg.lidar_end_time;
-        }
-        return;
+        std::cout<<"acc_mean: "<<acc_mean.transpose()<<std::endl;
+        std::cout<<"gyr_mean: "<<gyr_mean.transpose()<<std::endl;
+
+        double acc_norm = acc_mean.norm();
+        double gyr_norm = gyr_mean.norm();
+
+        if (std::abs(acc_norm - 9.8) > 1 || gyr_norm > 1) {
+            return;
+        }        
+
+        double imu_scale = GRAVITY / acc_norm;
+
+        Eigen::Vector3d gI = acc_mean;
+        gI.normalize();
+        Eigen::Vector3d g(0, 0, 1);
+        Eigen::Vector3d n = gI.cross(g);  //from IMU to world
+        n.normalize();
+        double theta = std::acos(g.dot(gI));
+
+        Eigen::Matrix3d R = so3Exp(n * theta);
+        std::cout<<"R_wi: \n"<<R<<std::endl;
+
+        auto X = ieskf_ptr->getX();
+
+        X.rotation = Eigen::Quaterniond(R);
+        X.gravity << 0, 0, -GRAVITY;
+        X.ba = acc_mean + X.rotation.inverse() * X.gravity;
+        X.bg = gyr_mean;
+
+        std::cout<<"init, ba="<<X.ba.transpose()<<", bg="<<X.bg.transpose()<<std::endl;
+
+        imu_inited = true;
+        fbpropagate_ptr->imu_scale = imu_scale;
+        fbpropagate_ptr->last_imu = mg.imus.back();
+        fbpropagate_ptr->last_lidar_end_time_ = mg.lidar_end_time;
+
+        ieskf_ptr->setX(X);
     }
+    
     IESKF::State18 FrontEnd::readState() { return ieskf_ptr->getX(); }
 }  // namespace IESKFSlam

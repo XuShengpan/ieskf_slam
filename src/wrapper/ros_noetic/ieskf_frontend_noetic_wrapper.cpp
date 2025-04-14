@@ -7,12 +7,15 @@
  * @LastEditTime: 2023-07-02 15:25:59
  */
 #include "wrapper/ros_noetic/ieskf_frontend_noetic_wrapper.h"
+
 namespace ROSNoetic {
     IESKFFrontEndWrapper::IESKFFrontEndWrapper(ros::NodeHandle &nh) {
+
         std::string config_file_name, lidar_topic, imu_topic;
         nh.param<std::string>("wrapper/config_file_name", config_file_name, "");
         nh.param<std::string>("wrapper/lidar_topic", lidar_topic, "/lidar");
         nh.param<std::string>("wrapper/imu_topic", imu_topic, "/imu");
+
         front_end_ptr =
             std::make_shared<IESKFSlam::FrontEnd>(CONFIG_DIR + config_file_name, "front_end");
 
@@ -21,16 +24,23 @@ namespace ROSNoetic {
             nh.subscribe(lidar_topic, 100, &IESKFFrontEndWrapper::lidarCloudMsgCallBack, this);
         imu_subscriber = nh.subscribe(imu_topic, 100, &IESKFFrontEndWrapper::imuMsgCallBack, this);
         // 读取雷达类型
-        int lidar_type = 0;
+        int lidar_type = 0, point_skip = 4;
         nh.param<int>("wrapper/lidar_type", lidar_type, AVIA);
+        nh.param<int>("wrapper/point_skip", point_skip, 4);
+
         if (lidar_type == AVIA) {
             lidar_process_ptr = std::make_shared<AVIAProcess>();
         } else if (lidar_type == VELO) {
             lidar_process_ptr = std::make_shared<VelodyneProcess>();
+        } else if(lidar_type == HESAI_XT16) {
+            lidar_process_ptr = std::make_shared<HesaiXT16Process>();
         } else {
             std::cout << "unsupport lidar type" << std::endl;
             exit(100);
         }
+
+        lidar_process_ptr->set_point_skip(point_skip);
+
         curr_cloud_pub = nh.advertise<sensor_msgs::PointCloud2>("curr_cloud", 100);
         path_pub = nh.advertise<nav_msgs::Path>("path", 100);
         local_map_pub = nh.advertise<sensor_msgs::PointCloud2>("local_map", 100);

@@ -1,0 +1,4 @@
+<launch>
+    <rosparam command="load" file="$(find ieskf_slam)/config/v16_casm.yaml" />
+    <node pkg="ieskf_slam" type="ieskf_frontend_node" name="ieskf_frontend_node" output="screen" /> 
+</launch>

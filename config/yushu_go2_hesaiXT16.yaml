@@ -1,0 +1,19 @@
+wrapper:
+  config_file_name: "hesaiXT16_nova_robot.yaml"
+  lidar_topic: "/hesai/pandar"
+  imu_topic:  "/yushu_imu"
+  lidar_type: 10  # 0)avia 1) velodyne, 10)hesai XT16 lidar
+  point_skip: 4
+
+front_end:
+  extrin_r: [0, -1, 0, 
+                      1, 0, 0, 
+                      0, 0, 1]
+  extrin_t: [0.171, 0, 0.0908]
+  enable_record: false
+  record_file_name: ""
+ieskf:
+  cov_gyroscope: 0.1
+  cov_acceleration: 0.1
+  cov_bias_acceleration: 0.0001
+  cov_bias_gyroscope: 0.0001

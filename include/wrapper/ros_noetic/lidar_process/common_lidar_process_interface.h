@@ -16,5 +16,13 @@ namespace ROSNoetic {
        public:
         // 根据不同的lidar 转换成统一的cloud
         virtual bool process(const sensor_msgs::PointCloud2 &msg, IESKFSlam::PointCloud &cloud) = 0;
+
+        void set_point_skip(int point_skip)
+        {
+            _point_skip = point_skip;
+        }
+
+        protected:
+            int _point_skip {4};
     };
 }  // namespace ROSNoetic
