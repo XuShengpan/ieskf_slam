@@ -154,7 +154,7 @@ namespace IESKFSlam {
     }
     
     Eigen::Matrix<double, 18, 1> IESKF::getErrorState18(const State18 &s1, const State18 &s2) {
-        Eigen::Matrix<double, 18, 1> es;
+        static Eigen::Matrix<double, 18, 1> es;
         es.setZero();
         es.block<3, 1>(0, 0) =
             SO3Log(s2.rotation.toRotationMatrix().transpose() * s1.rotation.toRotationMatrix());
