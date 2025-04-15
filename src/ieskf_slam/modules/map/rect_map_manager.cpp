@@ -25,11 +25,13 @@ namespace IESKFSlam {
         if (local_map_ptr->empty()) {
             *local_map_ptr = scan;
         } else {
+
+            std::vector<int> ind;
+            std::vector<float> distance;
+
             // . 添加
             // . 离添加点的最近点大于分辨率就添加
             for (auto &&point : scan) {
-                std::vector<int> ind;
-                std::vector<float> distance;
                 kdtree_ptr->nearestKSearch(point, 5, ind, distance);
                 if (distance[0] > map_resolution) local_map_ptr->push_back(point);
             }
