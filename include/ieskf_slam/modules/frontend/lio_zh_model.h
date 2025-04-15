@@ -39,10 +39,6 @@ namespace IESKFSlam
             Eigen::Vector4d pabcd;
             Eigen::Vector3d dr;
 
-            #ifdef MP_EN
-                omp_set_num_threads(MP_PROC_NUM);
-                #pragma omp parallel for reduction(+: vaild_points_num) private(point_world, loss, pabcd)
-            #endif
             /**
              * 有效点的判断
              * 1. 将当前点变换到世界系下
@@ -51,6 +47,10 @@ namespace IESKFSlam
              * 4. 判断点离这个平面够不够近(达到阈值)
              * 5. 满足上述条件，设置为有效点。
             */
+            #ifdef MP_EN
+                omp_set_num_threads(MP_PROC_NUM);
+                #pragma omp parallel for reduction(+: vaild_points_num) private(point_world, loss, pabcd)
+            #endif
             for (size_t  i = 0; i < current_cloud_ptr->size(); i++)
             {
                 // . 变换到世界系
