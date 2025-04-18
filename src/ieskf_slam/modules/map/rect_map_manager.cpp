@@ -35,17 +35,36 @@ namespace IESKFSlam {
                 kdtree_ptr->nearestKSearch(point, 5, ind, distance);
                 if (distance[0] > map_resolution) local_map_ptr->push_back(point);
             }
-            // 删除
+            int left = 0;
+            int right = local_map_ptr->size()-1;
+            while(left < right) {
+                while(left < right) {
+                    const auto& pt = local_map_ptr->points[right];
+                    if(abs(pt.x - pos_t.x()) > map_side_length_2 ||
+                        abs(pt.y - pos_t.y()) > map_side_length_2 ||
+                        abs(pt.z - pos_t.z()) > map_side_length_2) {
+                           --right;
+                    } else {
+                        break;
+                    }
+                }
+                while(left < right) {
+                    const auto& pt = local_map_ptr->points[left];
+                    if(abs(pt.x - pos_t.x()) > map_side_length_2 ||
+                        abs(pt.y - pos_t.y()) > map_side_length_2 ||
+                        abs(pt.z - pos_t.z()) > map_side_length_2) {
+                           break;
+                    } else {
+                        ++left;
+                    }
+                }
+                if(left<right) {
+                    std::swap(local_map_ptr->points[left], local_map_ptr->points[right]);
+                    --right;
+                }
+            }
             // . 把地图中超过 地图范围的挪到后面，用resize删除
-            local_map_ptr->points.erase(
-                std::remove_if(local_map_ptr->points.begin(), local_map_ptr->points.end(),
-                    [&](const auto& pt) {
-                        return abs(pt.x - pos_t.x()) > map_side_length_2 ||
-                                      abs(pt.y - pos_t.y()) > map_side_length_2 ||
-                                      abs(pt.z - pos_t.z()) > map_side_length_2;
-                        }),
-                    local_map_ptr->points.end()
-                );
+            local_map_ptr->resize(right + 1);
         }
         kdtree_ptr->setInputCloud(local_map_ptr);
     }
