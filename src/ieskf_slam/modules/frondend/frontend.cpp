@@ -133,7 +133,7 @@ namespace IESKFSlam {
         return true;
     }
 
-    void FrontEnd::initState(MeasureGroup &mg) {
+    bool FrontEnd::initState(MeasureGroup &mg) {
 
         mpcdps::MeanCovFilter<3> mcf_acc, mcf_gyr;
         for (size_t i = 0; i < mg.imus.size(); i++) {
@@ -153,7 +153,7 @@ namespace IESKFSlam {
         double gyr_norm = gyr_mean.norm();
 
         if (std::abs(acc_norm - 9.8) > 1 || gyr_norm > 1) {
-            return;
+            return false;
         }        
 
         double imu_scale = GRAVITY / acc_norm;
@@ -183,6 +183,7 @@ namespace IESKFSlam {
         fbpropagate_ptr->last_lidar_end_time_ = mg.lidar_end_time;
 
         ieskf_ptr->setX(X);
+	return true;
     }
     
     IESKF::State18 FrontEnd::readState() { return ieskf_ptr->getX(); }
