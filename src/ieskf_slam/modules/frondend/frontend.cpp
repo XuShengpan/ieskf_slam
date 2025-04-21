@@ -64,15 +64,17 @@ namespace IESKFSlam {
         MeasureGroup mg;
         if (syncMeasureGroup(mg)) {
             if (!imu_inited) {
-                map_ptr->reset();
-                map_ptr->addScan(mg.cloud.cloud_ptr, Eigen::Quaterniond::Identity(),
-                                 Eigen::Vector3d::Zero());
-                initState(mg);
+                if(initState(mg)) {
+                    auto state = ieskf_ptr->getX();
+                    map_ptr->reset();
+                    map_ptr->addScan(mg.cloud.cloud_ptr, state.rotation, state.position);
+                }
                 return false;
             }
             fbpropagate_ptr->propagate(mg, ieskf_ptr);
             voxel_filter.setInputCloud(mg.cloud.cloud_ptr);
             voxel_filter.filter(*filter_point_cloud_ptr);
+            
             if(!ieskf_ptr->update())
                 return false;
             auto state = ieskf_ptr->getX();
@@ -130,7 +132,7 @@ namespace IESKFSlam {
         return true;
     }
 
-    void FrontEnd::initState(MeasureGroup &mg) {
+    bool FrontEnd::initState(MeasureGroup &mg) {
 
         mpcdps::MeanCovFilter<3> mcf_acc, mcf_gyr;
         for (size_t i = 0; i < mg.imus.size(); i++) {
@@ -150,7 +152,7 @@ namespace IESKFSlam {
         double gyr_norm = gyr_mean.norm();
 
         if (std::abs(acc_norm - 9.8) > 1 || gyr_norm > 1) {
-            return;
+            return false;
         }        
 
         double imu_scale = GRAVITY / acc_norm;
@@ -180,6 +182,8 @@ namespace IESKFSlam {
         fbpropagate_ptr->last_lidar_end_time_ = mg.lidar_end_time;
 
         ieskf_ptr->setX(X);
+
+        return true;
     }
     
     IESKF::State18 FrontEnd::readState() { return ieskf_ptr->getX(); }

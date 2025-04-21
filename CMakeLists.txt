@@ -23,6 +23,10 @@ find_package(catkin REQUIRED COMPONENTS
   roscpp
   rospy
   sensor_msgs
+  geometry_msgs
+  nav_msgs
+  pcl_ros
+  tf
 )
 find_package(PCL REQUIRED)
 # YAML CPP

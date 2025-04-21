@@ -15,9 +15,16 @@ namespace ROSNoetic {
     enum LIDAR_TYPE { AVIA = 0, VELO = 1 , HESAI_XT16=10};
     class IESKFFrontEndWrapper {
        private:
+
+        std::string odom_topic, global_cloud_topic, body_cloud_topic, path_topic;
+        std::string world_frame_id, body_frame_id;
+        bool publish_lidar_scan_in_local_frame {true};
+
         IESKFSlam::FrontEnd::Ptr front_end_ptr;
         ros::Subscriber cloud_subscriber;
         ros::Subscriber imu_subscriber;
+
+        ros::Publisher odom_pub;
         ros::Publisher curr_cloud_pub;
         ros::Publisher path_pub;
         ros::Publisher local_map_pub;

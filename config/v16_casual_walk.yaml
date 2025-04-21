@@ -17,3 +17,13 @@ ieskf:
   cov_acceleration: 0.1
   cov_bias_acceleration: 0.0001
   cov_bias_gyroscope: 0.0001
+
+publish:
+   odometry_topic: "/Odometry"
+   global_point_cloud_topic:  "local_map"     #local_map
+   body_point_cloud_topic: "curr_cloud"    #curr_cloud
+   path_topic: "path"   #path
+   world_frame_id: "map"   #map
+   body_frame_id:  "body"   #body
+   publish_lidar_scan_in_local_frame: false  # if false, publish_lidar_scan_in_world_frame
+

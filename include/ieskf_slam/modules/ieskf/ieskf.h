@@ -19,6 +19,8 @@ namespace IESKFSlam
         using Ptr = std::shared_ptr<IESKF>;
         struct State18
         {
+            double time {-1};
+
             Eigen::Quaterniond rotation;
             Eigen::Vector3d position;
             Eigen::Vector3d velocity;
@@ -50,7 +52,7 @@ namespace IESKFSlam
     public:
         IESKF(const std::string & config_path,const std::string &prefix);
         ~IESKF();
-        void predict(IMU imu,double dt);
+        void predict(IMU imu, double time);
         bool update();
         const State18&getX();
         void setX(const State18&x_in);

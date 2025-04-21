@@ -26,6 +26,8 @@ namespace IESKFSlam {
         Eigen::Matrix3d R_imu;
         double dt = 0;
         IMU in;
+        
+        bool first_imu = true;
         for (auto it_imu = v_imu.begin(); it_imu < (v_imu.end() - 1); it_imu++) {
             auto &&head = *(it_imu);
             auto &&tail = *(it_imu + 1);
@@ -33,14 +35,11 @@ namespace IESKFSlam {
             angvel_avr = 0.5 * (head.gyroscope + tail.gyroscope);
             acc_avr = 0.5 * (head.acceleration + tail.acceleration);
             acc_avr = acc_avr * imu_scale;
-            if (head.time_stamp.sec() < last_lidar_end_time_) {
-                dt = tail.time_stamp.sec() - last_lidar_end_time_;
-            } else {
-                dt = tail.time_stamp.sec() - head.time_stamp.sec();
-            }
+
             in.acceleration = acc_avr;
             in.gyroscope = angvel_avr;
-            ieskf_ptr->predict(in, dt);
+            ieskf_ptr->predict(in,  tail.time_stamp.sec());
+
             imu_state = ieskf_ptr->getX();
             angvel_last = angvel_avr - imu_state.bg;
             acc_s_last = imu_state.rotation * (acc_avr - imu_state.ba);
@@ -52,8 +51,7 @@ namespace IESKFSlam {
                                  imu_state.position, imu_state.rotation);
         }
 
-        dt = pcl_end_time - imu_end_time;
-        ieskf_ptr->predict(in, dt);
+        ieskf_ptr->predict(in, pcl_end_time);
         imu_state = ieskf_ptr->getX();
         last_imu_ = mg.imus.back();
         last_lidar_end_time_ = pcl_end_time;
