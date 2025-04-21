@@ -64,10 +64,13 @@ namespace IESKFSlam {
         MeasureGroup mg;
         if (syncMeasureGroup(mg)) {
             if (!imu_inited) {
-                map_ptr->reset();
-                map_ptr->addScan(mg.cloud.cloud_ptr, Eigen::Quaterniond::Identity(),
-                                 Eigen::Vector3d::Zero());
-                initState(mg);
+
+                if(initState(mg)) {
+                    auto state = ieskf_ptr->getX();
+                    map_ptr->reset();
+                    map_ptr->addScan(mg.cloud.cloud_ptr, state.rotation, state.position);
+                }
+                
                 return false;
             }
             fbpropagate_ptr->propagate(mg, ieskf_ptr);
