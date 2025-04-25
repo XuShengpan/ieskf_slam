@@ -95,16 +95,11 @@ namespace ROSNoetic {
         const Eigen::Quaterniond& q = X.rotation;
         auto stamp = ros::Time().fromSec(X.time);
 
-        static int n_init = 0;
         static tf::TransformBroadcaster br;
         tf::Transform                   transform;
         transform.setOrigin(tf::Vector3(p[0], p[1], p[2]));
         transform.setRotation( tf::Quaternion(q.x(), q.y(), q.z(), q.w()));
         br.sendTransform( tf::StampedTransform( transform, stamp, world_frame_id, body_frame_id) );
-        if(n_init < 10) {
-            ++n_init;
-            return;
-        }
 
         odom.header.frame_id = world_frame_id;
         odom.child_frame_id = body_frame_id;
@@ -130,17 +125,19 @@ namespace ROSNoetic {
         path.poses.push_back(psd);
         path_pub.publish(path);
         
-        IESKFSlam::PCLPointCloud cloud = front_end_ptr->readCurrentPointCloud();
-        if(!publish_lidar_scan_in_local_frame) {
-            pcl::transformPointCloud(cloud, cloud, IESKFSlam::compositeTransform(X.rotation, X.position).cast<float>());
-        }
+        bool init_map = false;
         sensor_msgs::PointCloud2 msg;
-        pcl::toROSMsg(cloud, msg);
-        if(publish_lidar_scan_in_local_frame) {
-            msg.header.frame_id = body_frame_id;
-        } else {
+        IESKFSlam::PCLPointCloud cloud = front_end_ptr->readCurrentPointCloud();
+        if(!publish_lidar_scan_in_local_frame || !init_map) {
+            pcl::transformPointCloud(cloud, cloud, IESKFSlam::compositeTransform(X.rotation, X.position).cast<float>());
+            pcl::toROSMsg(cloud, msg);
             msg.header.frame_id = world_frame_id;
+            init_map = true;
+        } else {
+            pcl::toROSMsg(cloud, msg);
+            msg.header.frame_id = body_frame_id;
         }
+
         msg.header.stamp = stamp;
         curr_cloud_pub.publish(msg);
 

@@ -1,0 +1,29 @@
+wrapper:
+  config_file_name: v16_casual_walk.yaml 
+  lidar_topic: /points_raw
+  imu_topic:  /imu_raw
+  lidar_type: 1 # 0)avia 1) velodyne
+  point_skip: 5
+
+front_end:
+  extrin_r: [-1,0,0,
+            0,1,0,
+            0,0,-1]
+  extrin_t: [0,0,0]
+  enable_record: false
+  record_file_name: ""
+ieskf:
+  cov_gyroscope: 0.1
+  cov_acceleration: 0.1
+  cov_bias_acceleration: 0.0001
+  cov_bias_gyroscope:     0.0001
+
+publish:
+   odometry_topic: "/Odometry"
+   global_point_cloud_topic:  "local_map"     #local_map
+   body_point_cloud_topic: "curr_cloud"    #curr_cloud
+   path_topic: "path"   #path
+   world_frame_id: "map"   #map
+   body_frame_id:  "body"   #body
+   publish_lidar_scan_in_local_frame: true  # if false, publish_lidar_scan_in_world_frame
+
