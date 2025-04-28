@@ -16,7 +16,7 @@ ieskf:
   cov_gyroscope: 0.1
   cov_acceleration: 0.1
   cov_bias_acceleration: 0.0001
-  cov_bias_gyroscope: 0.0001
+  cov_bias_gyroscope:     0.0001
 
 publish:
    odometry_topic: "/Odometry"
@@ -25,5 +25,5 @@ publish:
    path_topic: "path"   #path
    world_frame_id: "map"   #map
    body_frame_id:  "body"   #body
-   publish_lidar_scan_in_local_frame: false  # if false, publish_lidar_scan_in_world_frame
+   publish_lidar_scan_in_local_frame: true  # if false, publish_lidar_scan_in_world_frame
 

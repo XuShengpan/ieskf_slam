@@ -55,6 +55,7 @@ namespace IESKFSlam {
         const PCLPointCloud &readCurrentPointCloud();
         const PCLPointCloud &readCurrentLocalMap();
         bool syncMeasureGroup(MeasureGroup &mg);
+        
         bool initState(MeasureGroup &mg);
         IESKF::State18 readState();
     };

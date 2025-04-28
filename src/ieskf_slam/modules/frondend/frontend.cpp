@@ -64,18 +64,17 @@ namespace IESKFSlam {
         MeasureGroup mg;
         if (syncMeasureGroup(mg)) {
             if (!imu_inited) {
-
                 if(initState(mg)) {
                     auto state = ieskf_ptr->getX();
                     map_ptr->reset();
                     map_ptr->addScan(mg.cloud.cloud_ptr, state.rotation, state.position);
                 }
-                
                 return false;
             }
             fbpropagate_ptr->propagate(mg, ieskf_ptr);
             voxel_filter.setInputCloud(mg.cloud.cloud_ptr);
             voxel_filter.filter(*filter_point_cloud_ptr);
+            
             if(!ieskf_ptr->update())
                 return false;
             auto state = ieskf_ptr->getX();
@@ -183,7 +182,8 @@ namespace IESKFSlam {
         fbpropagate_ptr->last_lidar_end_time_ = mg.lidar_end_time;
 
         ieskf_ptr->setX(X);
-	return true;
+
+        return true;
     }
     
     IESKF::State18 FrontEnd::readState() { return ieskf_ptr->getX(); }

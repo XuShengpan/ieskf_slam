@@ -7,8 +7,11 @@
  * @LastEditTime: 2023-07-02 15:25:59
  */
 #include "wrapper/ros_noetic/ieskf_frontend_noetic_wrapper.h"
+#include <tf/transform_datatypes.h>
+#include <tf/transform_broadcaster.h>
 
 namespace ROSNoetic {
+
     IESKFFrontEndWrapper::IESKFFrontEndWrapper(ros::NodeHandle &nh) {
 
         std::string config_file_name, lidar_topic, imu_topic;
@@ -41,9 +44,20 @@ namespace ROSNoetic {
 
         lidar_process_ptr->set_point_skip(point_skip);
 
-        curr_cloud_pub = nh.advertise<sensor_msgs::PointCloud2>("curr_cloud", 100);
-        path_pub = nh.advertise<nav_msgs::Path>("path", 100);
-        local_map_pub = nh.advertise<sensor_msgs::PointCloud2>("local_map", 100);
+        nh.param<std::string>("publish/odometry_topic", odom_topic, "/odom");
+        nh.param<std::string>("publish/global_point_cloud_topic", global_cloud_topic, "local_map");
+        nh.param<std::string>("publish/body_point_cloud_topic", body_cloud_topic, "curr_cloud");
+        nh.param<std::string>("publish/path_topic", path_topic, "path");
+        nh.param<std::string>("publish/world_frame_id", world_frame_id, "world");
+        nh.param<std::string>("publish/body_frame_id", body_frame_id, "body");
+        nh.param<bool>("publish/publish_lidar_scan_in_local_frame", 
+            publish_lidar_scan_in_local_frame,  true);
+
+        curr_cloud_pub = nh.advertise<sensor_msgs::PointCloud2>(body_cloud_topic, 100);
+        path_pub = nh.advertise<nav_msgs::Path>(path_topic, 100);
+        local_map_pub = nh.advertise<sensor_msgs::PointCloud2>(global_cloud_topic, 100);
+        odom_pub = nh.advertise<nav_msgs::Odometry>(odom_topic, 100);
+
         run();
     }
 
@@ -74,26 +88,64 @@ namespace ROSNoetic {
     }
     void IESKFFrontEndWrapper::publishMsg() {
         static nav_msgs::Path path;
+        nav_msgs::Odometry odom;
+
         auto X = front_end_ptr->readState();
-        path.header.frame_id = "map";
+        const Eigen::Vector3d& p = X.position;
+        const Eigen::Quaterniond& q = X.rotation;
+        auto stamp = ros::Time().fromSec(X.time);
+
+        static tf::TransformBroadcaster br;
+        tf::Transform                   transform;
+        transform.setOrigin(tf::Vector3(p[0], p[1], p[2]));
+        transform.setRotation( tf::Quaternion(q.x(), q.y(), q.z(), q.w()));
+        br.sendTransform( tf::StampedTransform( transform, stamp, world_frame_id, body_frame_id) );
+
+        odom.header.frame_id = world_frame_id;
+        odom.child_frame_id = body_frame_id;
+        odom.header.stamp = stamp;
+        odom.pose.pose.position.x = p[0];
+        odom.pose.pose.position.y = p[1];
+        odom.pose.pose.position.z = p[2];
+
+        odom.pose.pose.orientation.x = q.x();
+        odom.pose.pose.orientation.y = q.y();
+        odom.pose.pose.orientation.z = q.z();
+        odom.pose.pose.orientation.w = q.w();
+
+        odom_pub.publish(odom);
+
+        path.header.frame_id = world_frame_id;
+        path.header.stamp = stamp;
+
         geometry_msgs::PoseStamped psd;
         psd.pose.position.x = X.position.x();
         psd.pose.position.y = X.position.y();
         psd.pose.position.z = X.position.z();
         path.poses.push_back(psd);
         path_pub.publish(path);
-        IESKFSlam::PCLPointCloud cloud = front_end_ptr->readCurrentPointCloud();
-        pcl::transformPointCloud(
-            cloud, cloud, IESKFSlam::compositeTransform(X.rotation, X.position).cast<float>());
-        // auto cloud =front_end_ptr->readCurrentPointCloud();
+        
+        bool init_map = false;
         sensor_msgs::PointCloud2 msg;
-        pcl::toROSMsg(cloud, msg);
-        msg.header.frame_id = "map";
+        IESKFSlam::PCLPointCloud cloud = front_end_ptr->readCurrentPointCloud();
+        if(!publish_lidar_scan_in_local_frame || !init_map) {
+            pcl::transformPointCloud(cloud, cloud, IESKFSlam::compositeTransform(X.rotation, X.position).cast<float>());
+            pcl::toROSMsg(cloud, msg);
+            msg.header.frame_id = world_frame_id;
+            init_map = true;
+        } else {
+            pcl::toROSMsg(cloud, msg);
+            msg.header.frame_id = body_frame_id;
+        }
+
+        msg.header.stamp = stamp;
         curr_cloud_pub.publish(msg);
 
         cloud = front_end_ptr->readCurrentLocalMap();
         pcl::toROSMsg(cloud, msg);
-        msg.header.frame_id = "map";
+        msg.header.frame_id = world_frame_id;
+        msg.header.stamp = stamp;
         local_map_pub.publish(msg);
+
     }
 }  // namespace ROSNoetic

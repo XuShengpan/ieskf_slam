@@ -41,7 +41,13 @@ namespace IESKFSlam {
 
     IESKF::~IESKF() {}
 
-    void IESKF::predict(IMU imu, double dt) {
+    void IESKF::predict(IMU imu, double time) {
+
+        if(X.time < 0) {
+            X.time = time;
+            return;
+        }
+        double dt = time - X.time;
 
         static Eigen::Matrix<double, 18, 18> Fx;
         static Eigen::Matrix<double, 18, 12> Fw;
@@ -77,6 +83,8 @@ namespace IESKFSlam {
         Fw.block<3, 3>(6, 3) = -Rdt;
         Fw.block<3, 3>(9, 6) = Fw.block<3, 3>(12, 9) = Idt;
         P = Fx * P * Fx.transpose() + Fw * Q * Fw.transpose();
+
+        X.time = time;
     }
 
     bool IESKF::update() {
